@@ -1,0 +1,24 @@
+name: Docker Image Deployment
+
+on: workflow_dispatch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build and Push Docker Image
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GCR_USERNAME: ${{ secrets.GCR_USERNAME }}
+          GCR_TOKEN: ${{ secrets.GCR_TOKEN }}
+          REGISTRY: "GCR"
+          IMAGE_REPO: "ghcr.io/dsaidgovsg/tcs-super-linter"
+          IMAGE_VERSION: "v1.0.0"  # or any version/tag you want to use
+          DOCKERFILE_PATH: "${{ github.workspace }}/Dockerfile-slim"
+        run: |
+          bash /path/to/your/script.sh

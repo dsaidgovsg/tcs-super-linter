@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 ################################################################################
 ############# Deploy Container to DockerHub @admiralawkbar #####################
@@ -27,6 +27,7 @@
 # IMAGE_REPO="${IMAGE_REPO}"               # Image repo to upload the image
 # IMAGE_VERSION="${IMAGE_VERSION}"         # Version to tag the image
 # DOCKERFILE_PATH="${DOCKERFILE_PATH}"     # Path to the Dockerfile to be uploaded
+
 MAJOR_TAG=''         # Major tag version if we need to update it
 UPDATE_MAJOR_TAG=0   # Flag to deploy the major tag version as well
 GCR_URL='ghcr.io'    # URL to Github Container Registry
@@ -573,7 +574,7 @@ FindBuiltImage() {
   ###############################
   # Check if we found the image #
   ###############################
-  if [ ${FOUND_MAJOR} -eq 1 ] && [ ${FOUND_RELASE} -eq 1 ]; then
+  if [ "${FOUND_MAJOR}" -eq 1 ] && [ "${FOUND_RELASE}" -eq 1 ]; then
     FOUND_IMAGE=1
   fi
 }
