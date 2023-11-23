@@ -1,6 +1,7 @@
----
-name: Release
+#
+name: Create and publish a Docker image
 
+# Configures this workflow to run every time a change is pushed to the branch called `release`.
 on:
   release:
     types: [published]
@@ -11,125 +12,43 @@ on:
         required: true
         default: 'v'
 
+# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
-  release:
-    name: Release Images
+  build-and-push-image:
     runs-on: ubuntu-latest
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
-      contents: write
-      deployments: write
-      issues: write
+      contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        images:
-          - prefix: slim-
-            environment: Release-SLIM
-    timeout-minutes: 60
-
+      #
     steps:
-      - name: Setup Docker BuildX
-        uses: docker/setup-buildx-action@v3.0.0
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3.0.0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      # Uses the `docker/login-action` action to log in to the Container registry registry using the account and password that will publish the packages. Once published, the packages are scoped to the account defined here.
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Retrieve Current Release Version
-        # shellcheck disable=SC2062
-        run: |
-          RELEASE_VERSION="${{ github.event.release.name }}"
-
-          if [ -z "${RELEASE_VERSION}" ]; then
-            echo "No release version found in environment, using input..."
-            RELEASE_VERSION="${{ github.event.inputs.release_version }}"
-          fi
-
-          # Check the RELEASE_VERSION again
-          if [ -z "${RELEASE_VERSION}" ]; then
-            echo "Error RELEASE_VERSION is empty. Exiting..."
-            exit 1
-          fi
-
-          if ! echo "${RELEASE_VERSION}" | grep -E -o "v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+"; then
-            echo "Error: RELEASE_VERSION doesn't look like a semantic version: ${RELEASE_VERSION}"
-            exit 2
-          fi
-
-          SEMVER_VERSION=${RELEASE_VERSION#v}
-          SEMVER_MAJOR_VERSION=${SEMVER_VERSION%%.*}
-          SEMVER_MAJOR_VERSION_WITH_PREFIX=v${SEMVER_MAJOR_VERSION}
-
-          {
-            echo "RELEASE_VERSION=${RELEASE_VERSION}"
-            echo "SEMVER_VERSION=${SEMVER_VERSION}"
-            echo "SEMVER_MAJOR_VERSION=${SEMVER_MAJOR_VERSION}"
-            echo "SEMVER_MAJOR_VERSION_WITH_PREFIX=${SEMVER_MAJOR_VERSION_WITH_PREFIX}"
-          } >> "${GITHUB_ENV}"
-
-      - name: Start ${{ matrix.images.environment }} Deployment
-        uses: bobheadxi/deployments@v1.4.0
-        id: deployment
+      # This step uses [docker/metadata-action](https://github.com/docker/metadata-action#about) to extract tags and labels that will be applied to the specified image. The `id` "meta" allows the output of this step to be referenced in a subsequent step. The `images` value provides the base name for the tags and labels.
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          step: start
-          token: ${{ secrets.GITHUB_TOKEN }}
-          env: ${{ matrix.images.environment }}
-
-      # # We don't rebuild the image to avoid that the latest tag and the release tags don't point to what the release tag is pointing to.
-      # # Instead, we pull the latest image and tag it.
-      # - name: Retag and Push Images
-      #   uses: akhilerm/tag-push-action@v2.1.0
-      #   with:
-      #     src: ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}latest
-      #     dst: |
-      #       ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.SEMVER_MAJOR_VERSION_WITH_PREFIX }}
-      #       ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.RELEASE_VERSION }}
-
-      - name: Checkout Code
-        uses: actions/checkout@v4
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      # This step uses the `docker/build-push-action` action to build the image, based on your repository's `Dockerfile`. If the build succeeds, it pushes the image to GitHub Packages.
+      # It uses the `context` parameter to define the build's context as the set of files located in the specified path. For more information, see "[Usage](https://github.com/docker/build-push-action#usage)" in the README of the `docker/build-push-action` repository.
+      # It uses the `tags` and `labels` parameters to tag and label the image with the output from the "meta" step.
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
-          ref: main
-          # Full git history is needed to get a proper list of commits and tags
-          fetch-depth: 0
-
-      # We use ^{} to recursively deference the tag to get the commit the tag is pointing at.
-      # Then, we use that reference to create new tags, so that the new tags point to the commit
-      # the original tag was pointing to, and not to the original tag.
-      # This notation is documented at https://git-scm.com/docs/gitrevisions#Documentation/gitrevisions.txt-emltrevgtemegemv0998em
-      - name: Update Major Version and Latest Git Tag
-        run: |
-          git tag --force "${SEMVER_MAJOR_VERSION_WITH_PREFIX}" "${RELEASE_VERSION}^{}"
-          git tag --force latest "${RELEASE_VERSION}^{}"
-          git push --force origin "refs/tags/${SEMVER_MAJOR_VERSION_WITH_PREFIX}" "refs/tags/latest"
-
-      - name: Update ${{ matrix.images.environment }} Deployment
-        uses: bobheadxi/deployments@v1.4.0
-        if: always()
-        with:
-          step: finish
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: ${{ job.status }}
-          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ steps.deployment.outputs.env }}
-          env_url: https://github.com/dsaidgovsg/tcs-super-linter/releases/tag/${{ env.RELEASE_VERSION }}
-
-      - name: Create Issue on Failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const create = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: "Failed to deploy release to production",
-              body: "Automation has failed us! Failed to push release ${{ env.RELEASE_VERSION }}\nMore information can be found at:\n - ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              assignees: [
-                'zkoppert',
-                'Hanse00'
-              ]
-            })
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
