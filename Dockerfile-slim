@@ -76,7 +76,8 @@ RUN apk add --no-cache \
     R R-dev R-doc \
     readline-dev \
     ruby ruby-dev ruby-bundler ruby-rdoc \
-    zlib zlib-dev
+    zlib zlib-dev \
+    tar
 
 ########################################
 # Copy dependencies files to container #
