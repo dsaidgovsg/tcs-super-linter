@@ -21,4 +21,4 @@ jobs:
           IMAGE_VERSION: "v1.0.0"  # or any version/tag you want to use
           DOCKERFILE_PATH: "${{ github.workspace }}/Dockerfile-slim"
         run: |
-          bash /path/to/your/script.sh
+          bash .automation/upload-docker.sh
