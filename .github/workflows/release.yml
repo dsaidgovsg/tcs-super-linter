@@ -79,15 +79,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           env: ${{ matrix.images.environment }}
 
-      # We don't rebuild the image to avoid that the latest tag and the release tags don't point to what the release tag is pointing to.
-      # Instead, we pull the latest image and tag it.
-      - name: Retag and Push Images
-        uses: akhilerm/tag-push-action@v2.1.0
-        with:
-          src: ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}latest
-          dst: |
-            ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.SEMVER_MAJOR_VERSION_WITH_PREFIX }}
-            ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.RELEASE_VERSION }}
+      # # We don't rebuild the image to avoid that the latest tag and the release tags don't point to what the release tag is pointing to.
+      # # Instead, we pull the latest image and tag it.
+      # - name: Retag and Push Images
+      #   uses: akhilerm/tag-push-action@v2.1.0
+      #   with:
+      #     src: ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}latest
+      #     dst: |
+      #       ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.SEMVER_MAJOR_VERSION_WITH_PREFIX }}
+      #       ghcr.io/dsaidgovsg/tcs-super-linter:${{ matrix.images.prefix }}${{ env.RELEASE_VERSION }}
 
       - name: Checkout Code
         uses: actions/checkout@v4
